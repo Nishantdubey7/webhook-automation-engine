@@ -1,6 +1,8 @@
 # Webhook Automation Engine
 
-An asynchronous, multi-tenant webhook automation engine built with **NestJS**, **BullMQ**, **MongoDB**, **Redis**, and **React**. The system ingests webhooks, processes them asynchronously using a queue, applies configurable automation rules, and provides replay support for failed jobs.
+An asynchronous, multi-tenant webhook automation engine built with **NestJS**, **BullMQ**, **MongoDB**, **Redis**, and **React**.
+
+This project demonstrates reliable webhook ingestion, asynchronous rule execution, deduplication, failure recovery, replay support, and tenant isolation.
 
 ---
 
@@ -19,17 +21,19 @@ An asynchronous, multi-tenant webhook automation engine built with **NestJS**, *
 
 ## Tech Stack
 
-- Backend: NestJS
-- Frontend: React (Vite)
-- Database: MongoDB
-- Queue: BullMQ + Redis
-- Containerization: Docker
+| Layer            | Technology     |
+| ---------------- | -------------- |
+| Backend          | NestJS         |
+| Frontend         | React (Vite)   |
+| Database         | MongoDB        |
+| Queue            | BullMQ + Redis |
+| Containerization | Docker         |
 
 ---
 
 ## Dashboard
 
-The application provides a simple multi-tenant dashboard to monitor webhook events, automation rules, job execution status, and replay failed jobs.
+The application provides a simple multi-tenant dashboard to monitor incoming webhook events, automation rules, job execution status, and replay failed jobs.
 
 ### Job Runs
 
@@ -40,46 +44,53 @@ The application provides a simple multi-tenant dashboard to monitor webhook even
 ### Incoming Events
 
 <p align="center">
-  <img src="assets/incoming-events.png" alt="Incoming Events" width="900">
+  <img src="assets/incoming-events.png" alt="Incoming Events Dashboard" width="900">
 </p>
 
 ### Rules
 
 <p align="center">
-  <img src="assets/rules.png" alt="Automation Rules" width="900">
+  <img src="assets/rules.png" alt="Rules Dashboard" width="900">
 </p>
-
-```
-
-## Project Structure
-
-```
-
-backend/
-frontend/
-sample-data/
-docker-compose.yml
-
-````
 
 ---
 
-## Running the Project
+## Project Structure
 
-### 1. Start the application
+```text
+backend/
+frontend/
+sample-data/
+assets/
+docker-compose.yml
+README.md
+```
+
+---
+
+## Getting Started
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/Nishantdubey7/webhook-automation-engine.git
+cd webhook-automation-engine
+```
+
+### 2. Start the application
 
 ```bash
 docker compose up --build
-````
+```
 
 This starts:
 
-- Backend (http://localhost:3000)
-- Frontend (http://localhost:5173)
+- Backend: http://localhost:3000
+- Frontend: http://localhost:5173
 - MongoDB
 - Redis
 
-### 2. Seed the database
+### 3. Seed the database
 
 ```bash
 docker exec -it webhook-backend-1 npm run seed
@@ -87,7 +98,7 @@ docker exec -it webhook-backend-1 npm run seed
 
 This creates demo tenants and automation rules.
 
-### 3. Send sample webhooks
+### 4. Simulate incoming webhooks
 
 ```bash
 node sample-data/send-sample-webhooks.js
@@ -102,32 +113,50 @@ The script demonstrates:
 
 ---
 
+## Environment Variables
+
+Create a `.env` file using the provided `.env.example`.
+
+```env
+PORT=3000
+MONGO_URI=mongodb://mongo:27017/webhook_engine
+REDIS_HOST=redis
+REDIS_PORT=6379
+DEFAULT_WEBHOOK_SECRET=dev-secret-change-me
+```
+
+---
+
 ## Data Model
 
-The application consists of four main collections:
+The application uses four primary collections:
 
 - **Tenant** – Stores tenant information and webhook signing secrets.
-- **WebhookEvent** – Stores every incoming webhook for auditing, deduplication, and replay.
-- **Rule** – Defines automation rules using triggers, conditions, and actions.
-- **JobRun** – Tracks execution status, retries, failures, and replay information.
+- **WebhookEvent** – Stores incoming webhook payloads for auditing, deduplication, and replay.
+- **Rule** – Defines automation triggers, conditions, and actions.
+- **JobRun** – Stores execution history, retry attempts, failures, and replay information.
 
-This separation keeps ingestion, rule configuration, and execution history independent while maintaining tenant isolation.
+This separation keeps ingestion, rule configuration, and execution history independent while ensuring complete tenant isolation.
 
 ---
 
 ## Queue Design
 
-Each webhook is acknowledged immediately after validation and stored in MongoDB.
+After validating a webhook, the API immediately stores the event and acknowledges the request.
 
-Only the event ID is pushed to BullMQ. The worker:
+Only the event ID is pushed to BullMQ.
+
+The worker then:
 
 1. Loads the event
-2. Finds matching rules
+2. Finds matching automation rules
 3. Evaluates rule conditions
 4. Executes configured actions
-5. Stores the execution result in a JobRun document
+5. Records execution results in a JobRun document
 
-If a worker crashes, BullMQ retries the job. Successful actions are skipped during replay, ensuring idempotent execution.
+If processing fails, BullMQ retries the job automatically.
+
+Previously completed actions are skipped during replay, ensuring idempotent execution.
 
 ---
 
@@ -141,16 +170,16 @@ node sample-data/send-sample-webhooks.js
 
 The script sends:
 
-- Valid webhook
-- Duplicate webhook
-- Invalid signature webhook
-- Webhook for another tenant
+- A valid webhook
+- A duplicate webhook
+- A webhook with an invalid signature
+- A webhook for another tenant
 
 ---
 
 ## Triggering Failure and Replay
 
-A simulated downstream failure is included in the sample workflow.
+The sample workflow intentionally includes a simulated downstream failure.
 
 To replay a failed job:
 
@@ -164,24 +193,31 @@ Only failed actions are executed again.
 
 ## Scaling Considerations
 
-For a tenant processing 500,000 orders per day (approximately 1.5 million webhook events), the primary bottleneck is external action execution rather than MongoDB or Redis.
+For a tenant processing approximately **500,000 orders/day** (around **1.5 million webhook events/day**), the primary bottleneck is external action execution rather than MongoDB or Redis.
 
-The system can be scaled by:
+The system can scale by:
 
 - Running multiple BullMQ worker instances
 - Processing independent actions concurrently
 - Separating slow actions into dedicated queues
-- Horizontally scaling workers independently from the API
+- Scaling workers independently from the API
+- Keeping webhook ingestion lightweight while workers handle processing
 
 ---
 
 ## Demo
 
-The project demonstrates:
+The sample workflow demonstrates:
 
 - Fast webhook acknowledgement
-- Asynchronous processing
-- Deduplication
-- Failure recovery
-- Replay support
+- Asynchronous job processing
+- Duplicate webhook detection
+- Invalid signature rejection
 - Multi-tenant isolation
+- Failed job replay
+
+---
+
+## Author
+
+**Nishant Dubey**
